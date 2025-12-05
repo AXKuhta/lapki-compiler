@@ -25,7 +25,8 @@ static struct {
 } samples_cnt;
 
 // DAC buf: reserve size fo 56kHz (969)
-#define DAC_BUF_SZ          999UL
+#define DAC_BUF_SZ          1
+//999UL
 
 union DacSamplePair {
     uint32_t dw32;
@@ -89,12 +90,51 @@ void SetCarrierFreq(uint32_t carrier_freq_Hz) {
     samples_cnt.one    = (((kIr::One_us    * carrier_freq_Hz) + 1999999L) / 2000000L);
     samples_cnt.pause  = (((kIr::PauseAfter_us * carrier_freq_Hz) + 1999999UL) / 2000000UL);
     // Check if buf sz is enough
-    uint32_t N = samples_cnt.header + samples_cnt.space + (samples_cnt.one + samples_cnt.space) * IR_BIT_CNT_MAX + samples_cnt.pause;
-    if(N > DAC_BUF_SZ) Printf("IR TX DAC Buf Sz too small: %d < %d\r\n", DAC_BUF_SZ, N);
+    //uint32_t N = samples_cnt.header + samples_cnt.space + (samples_cnt.one + samples_cnt.space) * IR_BIT_CNT_MAX + samples_cnt.pause;
+    //if(N > DAC_BUF_SZ) Printf("IR TX DAC Buf Sz too small: %d < %d\r\n", DAC_BUF_SZ, N);
+}
+
+#define SEQUENCE_LENGTH 14000
+#define SAMPLE_RATE (56000*2)
+#define FS48_TO_FS112(X) int((X + 0.0) * 2.333333 + 0.5)
+
+uint8_t sequence[SEQUENCE_LENGTH];
+
+void TransmitWord(uint16_t data, int32_t bit_cnt, uint8_t power, ftVoidVoid callbackI) {
+    icallbackI = callbackI;
+
+    int period_6000_x1000 = (SAMPLE_RATE * 1000) / 6000;  // 8000
+    int period_2730_x1000 = (SAMPLE_RATE * 1000) / 2730;  // ~17582
+
+    for (int i = 0; i < SEQUENCE_LENGTH; i++) {
+        uint8_t value = 0;
+
+        if (i < FS48_TO_FS112(64)) {
+            int phase = (i * 1000) % period_6000_x1000;
+            value = (phase >= period_6000_x1000 / 2) ? 255 : 0;
+        }
+
+        for (int k = 0; k < 9; k++) {
+            int start = FS48_TO_FS112(135) + FS48_TO_FS112(595) * k;
+            if (i >= start && i < start + FS48_TO_FS112(64)) {
+                int j = i - start;
+                int phase = (j * 1000) % period_2730_x1000;
+                uint8_t multiplier = (k == 0) ? 1 : (data & (0x80 >> (k - 1))) ? 1 : 0;
+                value = multiplier * ((phase >= period_2730_x1000 / 2) ? 255 : 0);
+            }
+        }
+
+        sequence[i] = value;
+    }
+
+    dma_tx.SetMemoryAddr(sequence);
+    dma_tx.SetTransferDataCnt(14000);
+    dma_tx.Enable();
+    sampling_tmr.Enable();
 }
 
 // power is 8-bit DAC value
-void TransmitWord(uint16_t data, int32_t bit_cnt, uint8_t power, ftVoidVoid callbackI) {
+void TransmitWord___(uint16_t data, int32_t bit_cnt, uint8_t power, ftVoidVoid callbackI) {
     icallbackI = callbackI;
     // ==== Fill buffer depending on data ====
     DacSamplePair *p = dac_buf, sample_carrier{power}, sample_space{0};

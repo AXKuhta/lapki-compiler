@@ -2,7 +2,7 @@
 ######################### Project Settings #########################
 PRJ_NAME = IR_PCB
 # What to include, in form dir1 dir2 dir3...
-INCLUDE_DIRS = ./ Audio FileSys lib usb yartos Lapki
+INCLUDE_DIRS = ./ Audio Filesys lib usb yartos Lapki
 # What to define in form MYDEF1 MYDEF2=18 MYDEF3... $(MAKECMDGOALS) is name of requested action
 DEFINS = 
 DEFINS += BUILD_CFG_$(GOAL_NAME)=1 # add BUILD_CFG_GOALNAME=1 define, uppercasing GOAL_NAME
