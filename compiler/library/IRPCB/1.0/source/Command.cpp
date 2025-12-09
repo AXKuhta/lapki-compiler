@@ -70,6 +70,29 @@ static void DoTest(Shell *pshell) {
     tmr_testing.StartOrRestart();
 }
 #endif
+
+
+static void IrTx(Shell *pshell) {
+    Cmd *pcmd = &pshell->cmd;
+    int32_t pwr, bit_indx = 16; // Fill word starting from MSB
+    uint16_t word = 0;
+    if(pcmd->GetNext(&pwr).NotOk()) { pshell->BadParam(); return; }
+    char *S;
+    while((S = pcmd->GetNextString()) != nullptr and bit_indx > 0) {
+        while(*S != '\0') {
+            bit_indx--;
+            if(*S++ != '0') word |= (1U << bit_indx); // !0 means 1
+            if(bit_indx == 0) break; // it was the last bit
+        }
+    }
+    uint32_t bit_cnt = 16 - bit_indx;
+    if(bit_cnt == 0) { pshell->BadParam(); return; }
+    Printf("Word16: 0x%X; bit number: %u\r", word, bit_cnt);
+    IRLed::TransmitWord(word, bit_cnt, pwr, nullptr);
+    pshell->Ok();
+}
+
+
 #ifdef APP
 static void GetSta(Shell *pshell) { pshell->Print("Hits: %d; Rnds: %d; mgzs: %d\r", hit_cnt, rounds_cnt, magazines_cnt); }
 
@@ -120,26 +143,6 @@ static void SaveSettings(Shell *pshell) {
 static void LoadSettings(Shell *pshell) {
     settings.Load();
     Reset();
-}
-
-static void IrTx(Shell *pshell) {
-    Cmd *pcmd = &pshell->cmd;
-    int32_t pwr, bit_indx = 16; // Fill word starting from MSB
-    uint16_t word = 0;
-    if(pcmd->GetNext(&pwr).NotOk()) { pshell->BadParam(); return; }
-    char *S;
-    while((S = pcmd->GetNextString()) != nullptr and bit_indx > 0) {
-        while(*S != '\0') {
-            bit_indx--;
-            if(*S++ != '0') word |= (1U << bit_indx); // !0 means 1
-            if(bit_indx == 0) break; // it was the last bit
-        }
-    }
-    uint32_t bit_cnt = 16 - bit_indx;
-    if(bit_cnt == 0) { pshell->BadParam(); return; }
-    Printf("Word16: 0x%X; bit number: %u\r", word, bit_cnt);
-    IRLed::TransmitWord(word, bit_cnt, pwr, nullptr);
-    pshell->Ok();
 }
 
 static void CmdFire(Shell *pshell) {
@@ -210,6 +213,8 @@ static const ShellCmd cmds[] = {
         {"Version", DoVersion, "Show firmware version"},
         {"Test",    DoTest,    "Start hardware testing"},
         {"Reboot",  DoReboot,  "Reboot MCU"},
+        {"IrTx", IrTx, "'IrTx Pwr, bits': transmit bits (up to 16) via IR LED at specified power. Divide bits into pieces for convenience. Ex: 'IRTx 90, 1100 0101 11 1001"},
+
         // ==== App ====
 #ifdef APP
         {"GetSta",  GetSta,    "Get current status of device (hit count etc.)"},
@@ -222,7 +227,6 @@ static const ShellCmd cmds[] = {
         {"Burst", CmdBurst, "Fire burst"},
         {"Stop", CmdStop, "Stop Fire"},
         // ==== Research ====
-        {"IrTx", IrTx,"'IrTx Pwr, bits': transmit bits (up to 16) via IR LED at specified power. Divide bits into pieces for convenience. Ex: 'IRTx 90, 1100 0101 11 1001"},
 #endif
         // ==== Debug ====
 //        {"SetLed", SetLed, "set led PWM"},
